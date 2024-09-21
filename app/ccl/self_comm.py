@@ -60,9 +60,7 @@ def aimd(rtt):
     
     smooth_rtt = alpha * rtt + (1 - alpha) * smooth_rtt
 
-    # 判断是否增大或减小压缩率
     if smooth_rtt < last_rtt:
-        # 自适应增量调整
         compress_ratio = min(compress_ratio + 0.001, 1)
     else:
         compress_ratio = max(compress_ratio * 0.95, 0.005)
@@ -98,19 +96,13 @@ def adaptive_sparsify_comm_hook(state, bucket):
         combined_values = torch.cat(gathered_values)
         combined_indices = torch.cat(gathered_indices)
         return combined_values, combined_indices
-    
-
     start_time = time.perf_counter()
-
     combined_values, combined_indices = gather()
-
     end_time = time.perf_counter()
     rtt = end_time - start_time
     compress_ratio = aimd(rtt)
-
     # Decompress the tensor with combined values and indices
     decompressed_tensor = compressor.decompress((combined_values, combined_indices, numel), tensor.size())
-    
     # Return the decompressed tensor divided by world size
     fut = torch.futures.Future()
     fut.set_result(decompressed_tensor / dist.get_world_size())
