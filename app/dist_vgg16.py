@@ -13,7 +13,7 @@ from torch.nn.parallel import DistributedDataParallel
 import sys
 import logging
 
-from ccl.self_comm import sparsify_comm_hook, adaptive_sparsify_comm_hook
+from ccl.self_comm import sparsify_comm_hook, adaptive_sparsify_comm_hook, adaptive_bbr_comm_hook
 from prune.unstructured_prune import l1_unstructured_prune_model
 
 def parse():
@@ -79,7 +79,7 @@ model = model.to(device)
 model = l1_unstructured_prune_model(model, amount=0.5)
 model = DistributedDataParallel(model, device_ids=None)
 
-model.register_comm_hook(None, hook=adaptive_sparsify_comm_hook)
+model.register_comm_hook(None, hook=adaptive_bbr_comm_hook)
 
 
 # 定义损失函数和优化器
@@ -105,7 +105,6 @@ for epoch in range(num_epochs):
     total_loss = 0  # 用于累加每个 epoch 的总损失
     correct_predictions = 0
     total_samples = 0
-    
     progress_bar = tqdm(train_dataloader, desc=f"Epoch {epoch + 1}")  # tqdm 进度条
     
     for step, (inputs, labels) in enumerate(progress_bar):
