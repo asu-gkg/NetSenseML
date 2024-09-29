@@ -71,6 +71,31 @@ else:
     print("Downloading and saving VGG16 pretrained model weights...")
     model = models.vgg16(pretrained=True)  # 下载预训练模型
     torch.save(model.state_dict(), model_path)  # 保存预训练权重到本地
+    
+def evaluate(model, test_loader, criterion):
+    model.eval()
+    total_loss = 0.0
+    correct_predictions = 0
+    total_samples = 0
+
+    with torch.no_grad():
+        for inputs, labels in tqdm(test_loader, desc="Evaluating", unit="batch"):
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            
+            # 统计损失和准确率
+            total_loss += loss.item()
+            _, preds = torch.max(outputs, 1)
+            correct_predictions += torch.sum(preds == labels).item()
+            total_samples += labels.size(0)
+    
+    avg_loss = total_loss / len(test_loader)
+    accuracy = correct_predictions / total_samples
+    
+    return avg_loss, accuracy
+
 
 # 替换最后一层分类器以适应 CIFAR-100 (100 类)
 model.classifier[6] = nn.Linear(4096, 100)
@@ -132,16 +157,15 @@ for epoch in range(num_epochs):
 
         # tqdm 进度条显示
         progress_bar.set_postfix(loss=avg_loss, accuracy=accuracy)
-        logging.info(f'Epoch {epoch + 1}/{step + 1}, loss: {avg_loss:.4f}, accuracy: {accuracy:.4f}')
-
+        # logging.info(f'Epoch {epoch + 1}/{step + 1}, loss: {avg_loss:.4f}, accuracy: {accuracy:.4f}')
+    
     # 计算每个 epoch 的平均损失和准确率
-    avg_loss = total_loss / len(train_dataloader)
-    accuracy = correct_predictions / total_samples
+    test_loss, test_accuracy = evaluate(model, test_dataloader, criterion)
     epoch_time = (time.time() - start_time) / 60  # 时间以分钟计算
-    # 学习率调度器更新
+    
     lr_scheduler.step()
     # 每个 epoch 完成后打印损失和准确率
-    print(f"Epoch {epoch + 1}/{num_epochs} finished, Loss: {avg_loss:.4f}, Accuracy: {accuracy:.4f}")
+    logging.info(f"Epoch {epoch + 1}/{num_epochs} finished, Test_Loss: {test_loss:.4f}, Test_Accuracy: {test_accuracy:.4f}")
 
 plt.savefig("vgg16_training_plot.png")  # 保存为 PNG 格式
 
