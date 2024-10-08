@@ -158,7 +158,8 @@ for epoch in range(num_epochs):
 
         # tqdm 进度条显示
         progress_bar.set_postfix(loss=avg_loss, accuracy=accuracy)
-        # logging.info(f'Epoch {epoch + 1}/{step + 1}, loss: {avg_loss:.4f}, accuracy: {accuracy:.4f}')
+        if step%50==0:
+            logging.info(f'Epoch {epoch + 1}/{step + 1}, loss: {avg_loss:.4f}, accuracy: {accuracy:.4f}')
     
     # 计算每个 epoch 的平均损失和准确率
     test_loss, test_accuracy = evaluate(model, test_dataloader, criterion)
