@@ -38,7 +38,7 @@ logging.basicConfig(
 )
 
 device = torch.device("cuda")
-dist.init_process_group(backend='gloo', init_method=dist_url, rank=rank, world_size=world_size)
+dist.init_process_group(backend='nccl', init_method=dist_url, rank=rank, world_size=world_size)
 
 data_path = './data/cifar100'
 
