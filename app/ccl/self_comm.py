@@ -154,7 +154,7 @@ def update_compression_ratio(rtt, bandwidth, data_in_flight):
 
 def adaptive_bbr_comm_hook(state, bucket):
     global compress_ratio
-    print(compress_ratio)
+    # print(compress_ratio)
     if compress_ratio == 1:
         return default_comm_hook(state, bucket)
 
@@ -197,7 +197,6 @@ def adaptive_bbr_comm_hook(state, bucket):
     fut = torch.futures.Future()
     fut.set_result(decompressed_tensor / dist.get_world_size())
     return fut
-
 
 def common_gather(values, indices):
     gathered_values = [torch.zeros_like(values) for _ in range(dist.get_world_size())]
