@@ -3,7 +3,6 @@ import torch
 import time
 import logging
 from ccl.compensator import SparsifyCompensator
-from ccl.topk import TopKCompressor
 
 def default_comm_hook(state, bucket):
     tensor = bucket.buffer()
@@ -62,6 +61,42 @@ def update_compression_ratio(rtt, bandwidth, data_in_flight):
     
     return compress_ratio
 
+
+class SimpleDGCCompressor:
+    def __init__(self, compress_ratio=0.01):
+        self.compress_ratio = compress_ratio
+
+    def _sparsify(self, tensor):
+        # Flatten the tensor
+        tensor = tensor.view(-1)
+        numel = tensor.numel()
+        num_selects = max(1, int(numel * self.compress_ratio))
+
+        # Get the importance (absolute values)
+        importance = tensor.abs()
+
+        # Find the top k% elements directly using topk
+        values, indices = torch.topk(importance, num_selects, sorted=False)
+
+        return values, indices, numel
+
+    def compress(self, tensor):
+        # Perform sparsification
+        values, indices, numel = self._sparsify(tensor)
+        
+        # Return the compressed representation and the original tensor size
+        return (values, indices, numel)
+
+    def decompress(self, compressed_tensor, original_size):
+        values, indices, numel = compressed_tensor
+        # Create an empty tensor of the original size
+        decompressed_tensor = torch.zeros(original_size, device=values.device)
+        # Put the values back to their original positions
+        decompressed_tensor.index_put_([indices], values)
+        # Reshape back to the original shape
+        return decompressed_tensor.view(original_size)
+
+
 def adaptive_bbr_comm_hook(state, bucket):
     global compress_ratio
     # print(compress_ratio)
@@ -69,7 +104,7 @@ def adaptive_bbr_comm_hook(state, bucket):
         return default_comm_hook(state, bucket)
 
     tensor = bucket.buffer()
-    compressor = TopKCompressor(compress_ratio)
+    compressor = SimpleDGCCompressor(compress_ratio)
     values, indices, numel = compressor.compress(tensor)
 
     start_time = time.perf_counter()
