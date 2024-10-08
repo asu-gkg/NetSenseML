@@ -112,7 +112,7 @@ criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
 # 定义学习率调度器
-num_epochs = 50
+num_epochs = 10
 lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 
 plt.ion()  # 打开交互模式
@@ -158,7 +158,8 @@ for epoch in range(num_epochs):
 
         # tqdm 进度条显示
         progress_bar.set_postfix(loss=avg_loss, accuracy=accuracy)
-        # logging.info(f'Epoch {epoch + 1}/{step + 1}, loss: {avg_loss:.4f}, accuracy: {accuracy:.4f}')
+        if step%50==0:
+            logging.info(f'Epoch {epoch + 1}/{step + 1}, loss: {avg_loss:.4f}, accuracy: {accuracy:.4f}')
     
     # 计算每个 epoch 的平均损失和准确率
     test_loss, test_accuracy = evaluate(model, test_dataloader, criterion)

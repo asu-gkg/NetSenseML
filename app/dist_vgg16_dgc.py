@@ -125,7 +125,7 @@ accuracy_list = []
 time_list = []
 start_time = time.time()
 
-
+model.register_comm_hook(compensator, hook=DgcCommHook)
 # 训练循环
 model.train()
 for epoch in range(num_epochs):
@@ -134,8 +134,7 @@ for epoch in range(num_epochs):
     total_samples = 0
     progress_bar = tqdm(train_dataloader, desc=f"Epoch {epoch + 1}")  # tqdm 进度条
     train_sampler.set_epoch(epoch)
-    if epoch > 5:
-        model.register_comm_hook(compensator, hook=DgcCommHook)
+        
     for step, (inputs, labels) in enumerate(progress_bar):
         inputs = inputs.to(device)
         labels = labels.to(device)
@@ -161,7 +160,8 @@ for epoch in range(num_epochs):
 
         # tqdm 进度条显示
         progress_bar.set_postfix(loss=avg_loss, accuracy=accuracy)
-        # logging.info(f'Epoch {epoch + 1}/{step + 1}, loss: {avg_loss:.4f}, accuracy: {accuracy:.4f}')
+        if step%50==0:
+            logging.info(f'Epoch {epoch + 1}/{step + 1}, loss: {avg_loss:.4f}, train_accuracy: {accuracy:.4f}')
     
     # 计算每个 epoch 的平均损失和准确率
     test_loss, test_accuracy = evaluate(model, test_dataloader, criterion)
