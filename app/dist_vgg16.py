@@ -39,7 +39,7 @@ logging.basicConfig(
 
 device = torch.device("cuda")
 dist.init_process_group(backend='nccl', init_method=dist_url, rank=rank, world_size=world_size)
-
+print("connected..")
 data_path = './data/cifar100'
 
 # 数据预处理
@@ -65,8 +65,8 @@ os.makedirs(os.path.dirname(model_path), exist_ok=True)
 # 如果本地有预训练的 VGG16 模型参数，则从本地加载
 if os.path.exists(model_path):
     print("Loading VGG16 model from local file...")
-    model = models.vgg16(pretrained=False)  # 不再下载预训练权重
-    model.load_state_dict(torch.load(model_path))  # 加载本地的权重
+    model = models.vgg16(pretrained=False) 
+    model.load_state_dict(torch.load(model_path)) 
 else:
     print("Downloading and saving VGG16 pretrained model weights...")
     model = models.vgg16(pretrained=True)  # 下载预训练模型
@@ -103,9 +103,8 @@ model = model.to(device)
 
 model = l1_unstructured_prune_model(model, amount=0.5)
 model = DistributedDataParallel(model, device_ids=None)
-
+print("register_comm_hook..")
 model.register_comm_hook(None, hook=adaptive_bbr_comm_hook)
-
 
 # 定义损失函数和优化器
 criterion = nn.CrossEntropyLoss()
