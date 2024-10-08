@@ -13,7 +13,6 @@ from torch.nn.parallel import DistributedDataParallel
 import sys
 import logging
 
-from ccl.self_comm import sparsify_comm_hook, adaptive_sparsify_comm_hook, adaptive_bbr_comm_hook, dgc_comm_hook
 from ccl.compensator import SparsifyCompensator
 from prune.unstructured_prune import l1_unstructured_prune_model
 
@@ -106,14 +105,14 @@ model = l1_unstructured_prune_model(model, amount=0.5)
 model = DistributedDataParallel(model, device_ids=None)
 print("register_comm_hook..")
 compensator = SparsifyCompensator(model)
-model.register_comm_hook(compensator, hook=sparsify_comm_hook)
+# model.register_comm_hook(compensator, hook=sparsify_comm_hook)
 
 # 定义损失函数和优化器
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
 # 定义学习率调度器
-num_epochs = 10
+num_epochs = 50
 lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 
 plt.ion()  # 打开交互模式
