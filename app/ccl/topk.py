@@ -17,41 +17,68 @@ def desparsify(tensors, numel):
     tensor_decompressed.scatter_(0, indices, values)
     return tensor_decompressed
 
-class TopKCompressor(Compressor):
-    def __init__(self, compress_ratio):
-        super().__init__()
+
+
+class TopKCompressor:
+    def __init__(self, compress_ratio=0.01):
         self.compress_ratio = compress_ratio
 
-    def compress(self, tensor, name):
-        tensors = sparsify(tensor, self.compress_ratio)
-        ctx = tensor.numel(), tensor.size()
-        return tensors, ctx
+    def _sparsify(self, tensor):
+        # Flatten the tensor
+        tensor = tensor.view(-1)
+        numel = tensor.numel()
+        num_selects = max(1, int(numel * self.compress_ratio))
 
-    def decompress(self, tensors, ctx):
-        """Decompress by filling empty slots with zeros and reshape back using the original shape"""
-        numel, shape = ctx
-        tensor_decompressed = desparsify(tensors, numel)
-        return tensor_decompressed.view(shape)
+        # Get the importance (absolute values)
+        importance = tensor.abs()
+
+        # Find the top k% elements directly using topk
+        threshold, indices = torch.topk(importance, num_selects, sorted=False)
+
+        # Extract the values at these indices
+        values = tensor[indices]
+        return values, indices, numel
+
+    def compress(self, tensor):
+        # Perform sparsification
+        values, indices, numel = self._sparsify(tensor)
+        
+        # Return the compressed representation and the original tensor size
+        return (values, indices, numel)
+
+    def decompress(self, compressed_tensor, original_size):
+        values, indices, numel = compressed_tensor
+        # Create an empty tensor of the original size
+        decompressed_tensor = torch.zeros(original_size, device=values.device)
+        # Put the values back to their original positions
+        decompressed_tensor.index_put_([indices], values)
+        # Reshape back to the original shape
+        return decompressed_tensor.view(original_size)
     
-    
+
+def common_gather(values, indices):
+    gathered_values = [torch.zeros_like(values) for _ in range(dist.get_world_size())]
+    gathered_indices = [torch.zeros_like(indices) for _ in range(dist.get_world_size())]
+    dist.all_gather(gathered_values, values)
+    dist.all_gather(gathered_indices, indices)
+    combined_values = torch.cat(gathered_values)
+    combined_indices = torch.cat(gathered_indices)
+    return combined_values, combined_indices
+
 
 def topk_comm_hook(state, bucket):
     tensor = bucket.buffer()
-    
-    compressor = TopKCompressor(compress_ratio=0.1)
-    compressed_tensors, ctx = compressor.compress(tensor, f"param_{bucket.index}")
-    
-    gathered_tensors = [torch.zeros_like(compressed_tensors[0]) for _ in range(dist.get_world_size())]
-    gathered_indices = [torch.zeros_like(compressed_tensors[1]) for _ in range(dist.get_world_size())]
 
-    dist.all_gather(gathered_tensors, compressed_tensors[0])  # gather values
-    dist.all_gather(gathered_indices, compressed_tensors[1])  # gather indices
+    # Create a compressor and compress the tensor
+    compressor = TopKCompressor(compress_ratio=0.005)
+    values, indices, numel = compressor.compress(tensor)
 
-    all_values = torch.cat(gathered_tensors)
-    all_indices = torch.cat(gathered_indices)
+    combined_values, combined_indices = common_gather()
 
-    decompressed_tensor = compressor.decompress((all_values, all_indices), ctx)
+    # Decompress the tensor with combined values and indices
+    decompressed_tensor = compressor.decompress((combined_values, combined_indices, numel), tensor.size())
 
+    # Return the decompressed tensor divided by world size
     fut = torch.futures.Future()
     fut.set_result(decompressed_tensor / dist.get_world_size())
     return fut

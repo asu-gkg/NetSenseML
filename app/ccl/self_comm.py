@@ -6,22 +6,7 @@ import logging
 from ccl.compensator import SparsifyCompensator
 from ccl.topk import TopKCompressor
 
-def sparsify_comm_hook(state, bucket):
-    tensor = bucket.buffer()
 
-    # Create a compressor and compress the tensor
-    compressor = TopKCompressor(compress_ratio=0.005)
-    values, indices, numel = compressor.compress(tensor)
-
-    combined_values, combined_indices = common_gather()
-
-    # Decompress the tensor with combined values and indices
-    decompressed_tensor = compressor.decompress((combined_values, combined_indices, numel), tensor.size())
-
-    # Return the decompressed tensor divided by world size
-    fut = torch.futures.Future()
-    fut.set_result(decompressed_tensor / dist.get_world_size())
-    return fut
 
 
 def default_comm_hook(state, bucket):

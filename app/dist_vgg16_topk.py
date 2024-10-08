@@ -106,7 +106,7 @@ model = l1_unstructured_prune_model(model, amount=0.5)
 model = DistributedDataParallel(model, device_ids=None)
 print("register_comm_hook..")
 compensator = SparsifyCompensator(model)
-
+model.register_comm_hook(compensator, hook=topk_comm_hook)
 
 # 定义损失函数和优化器
 criterion = nn.CrossEntropyLoss()
