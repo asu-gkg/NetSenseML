@@ -194,9 +194,8 @@ def adaptive_bbr_comm_hook(state, bucket):
     compress_ratio = update_compression_ratio(rtt, bandwidth, data_in_flight)
 
     decompressed_tensor = compressor.decompress((combined_values, combined_indices, numel), tensor.size())
-    combined_tensor = (tensor + decompressed_tensor) / 2 # 加权平均
     fut = torch.futures.Future()
-    fut.set_result(combined_tensor / dist.get_world_size())
+    fut.set_result(decompressed_tensor / dist.get_world_size())
     return fut
 
 
