@@ -51,7 +51,7 @@ def default_comm_hook(state, bucket):
 last_rtt = None
 smooth_rtt = None
 alpha = 0.1 # 平滑系数
-compress_ratio = 0.1
+compress_ratio = 0.7
 
 def aimd(rtt):
     global last_rtt, compress_ratio, smooth_rtt
@@ -154,7 +154,7 @@ def update_compression_ratio(rtt, bandwidth, data_in_flight):
 
 def adaptive_bbr_comm_hook(state, bucket):
     global compress_ratio
-    # print(compress_ratio)
+    print(compress_ratio)
     if compress_ratio == 1:
         return default_comm_hook(state, bucket)
 
