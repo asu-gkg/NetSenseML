@@ -159,6 +159,7 @@ def adaptive_bbr_comm_hook(state, bucket):
         return default_comm_hook(state, bucket)
 
     tensor = bucket.buffer()
+    compress_ratio = 0.1
     compressor = SimpleDGCCompressor(compress_ratio)
     values, indices, numel = compressor.compress(tensor)
 
