@@ -14,6 +14,7 @@ import sys
 import logging
 
 from ccl.self_comm import sparsify_comm_hook, adaptive_sparsify_comm_hook, adaptive_bbr_comm_hook, dgc_comm_hook
+from ccl.compensator import SparsifyCompensator
 from prune.unstructured_prune import l1_unstructured_prune_model
 
 def parse():
@@ -104,6 +105,7 @@ model = model.to(device)
 model = l1_unstructured_prune_model(model, amount=0.5)
 model = DistributedDataParallel(model, device_ids=None)
 print("register_comm_hook..")
+compensator = SparsifyCompensator(model)
 model.register_comm_hook(None, hook=dgc_comm_hook)
 
 # 定义损失函数和优化器
@@ -130,6 +132,7 @@ for epoch in range(num_epochs):
     correct_predictions = 0
     total_samples = 0
     progress_bar = tqdm(train_dataloader, desc=f"Epoch {epoch + 1}")  # tqdm 进度条
+    train_sampler.set_epoch(epoch)
     
     for step, (inputs, labels) in enumerate(progress_bar):
         inputs = inputs.to(device)
