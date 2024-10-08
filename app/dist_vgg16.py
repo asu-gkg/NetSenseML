@@ -65,11 +65,11 @@ os.makedirs(os.path.dirname(model_path), exist_ok=True)
 # 如果本地有预训练的 VGG16 模型参数，则从本地加载
 if os.path.exists(model_path):
     print("Loading VGG16 model from local file...")
-    model = models.vgg16(pretrained=False) 
+    model = models.vgg16(pretrained=True) 
     model.load_state_dict(torch.load(model_path)) 
 else:
     print("Downloading and saving VGG16 pretrained model weights...")
-    model = models.vgg16(pretrained=False)  # 下载预训练模型
+    model = models.vgg16(pretrained=True)  # 下载预训练模型
     torch.save(model.state_dict(), model_path)  # 保存预训练权重到本地
     
 def evaluate(model, test_loader, criterion):

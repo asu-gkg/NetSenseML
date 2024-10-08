@@ -1,6 +1,7 @@
 import torch
 import torch.distributed as dist
 from ccl import Memory
+from ccl.topk import TopKCompressor
 
 class DgcMemory(Memory):
     def __init__(self, momentum, gradient_clipping):
@@ -47,3 +48,41 @@ class DgcMemory(Memory):
         self.residuals[name] = temp
         temp = self.gradients[name] * not_mask
         self.gradients[name] = temp
+        
+        
+class DgcCommHook:
+    def __init__(self, momentum=0.9, gradient_clipping=True, compress_ratio=0.01):
+        self.dgc_memory = DgcMemory(momentum, gradient_clipping)
+        self.compressor = TopKCompressor(compress_ratio)
+
+    def dgc_comm_hook(self, state, bucket: dist.GradBucket):
+        # 获取当前梯度的张量
+        tensor = bucket.buffer()
+        param_name = f"param_{bucket.index}_{tensor.size()}"
+
+        # 使用 DGC 内存进行补偿
+        compensated_tensor = self.dgc_memory.compensate(tensor, param_name)
+
+        # 压缩补偿后的梯度
+        compressed_tensor, ctx = self.compressor.compress(compensated_tensor, param_name)
+
+        # 执行 all_reduce 操作来同步梯度
+        gathered_values = [torch.zeros_like(compressed_tensor[0]) for _ in range(dist.get_world_size())]
+        gathered_indices = [torch.zeros_like(compressed_tensor[1]) for _ in range(dist.get_world_size())]
+        
+        dist.all_gather(gathered_values, compressed_tensor[0])  # Gather values
+        dist.all_gather(gathered_indices, compressed_tensor[1])  # Gather indices
+
+        # 聚合并解压梯度
+        all_values = torch.cat(gathered_values)
+        all_indices = torch.cat(gathered_indices)
+
+        decompressed_tensor = self.compressor.decompress((all_values, all_indices), ctx)
+
+        # 使用 DGC 更新残差
+        self.dgc_memory.update(tensor, param_name, self.compressor, decompressed_tensor, ctx)
+
+        # 返回解压后的张量并进行归一化
+        fut = torch.futures.Future()
+        fut.set_result(decompressed_tensor / dist.get_world_size())
+        return fut
