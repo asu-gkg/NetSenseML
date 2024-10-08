@@ -3,6 +3,7 @@ import torch
 from ccl.gdc_compression import SimpleDGCCompressor
 import time
 import logging
+from ccl.compensator import SparsifyCompensator
 
 def sparsify_comm_hook(state, bucket):
     tensor = bucket.buffer()
@@ -153,7 +154,7 @@ def update_compression_ratio(rtt, bandwidth, data_in_flight):
 
 def adaptive_bbr_comm_hook(state, bucket):
     global compress_ratio
-    # print(compress_ratio)
+    print(compress_ratio)
     if compress_ratio == 1:
         return default_comm_hook(state, bucket)
 
@@ -193,6 +194,31 @@ def adaptive_bbr_comm_hook(state, bucket):
     compress_ratio = update_compression_ratio(rtt, bandwidth, data_in_flight)
 
     decompressed_tensor = compressor.decompress((combined_values, combined_indices, numel), tensor.size())
+    fut = torch.futures.Future()
+    fut.set_result(decompressed_tensor / dist.get_world_size())
+    return fut
+
+def common_gather(values, indices):
+    gathered_values = [torch.zeros_like(values) for _ in range(dist.get_world_size())]
+    gathered_indices = [torch.zeros_like(indices) for _ in range(dist.get_world_size())]
+    dist.all_gather(gathered_values, values)
+    dist.all_gather(gathered_indices, indices)
+    combined_values = torch.cat(gathered_values)
+    combined_indices = torch.cat(gathered_indices)
+    return combined_values, combined_indices
+
+def dgc_comm_hook(state: SparsifyCompensator, bucket: torch.distributed.GradBucket):
+    tensor = bucket.buffer()
+    param_name = f"param_{bucket.index}_{tensor.size}"
+    
+    compensated_tensor = state.compensate(tensor, param_name)
+    
+    compressor = SimpleDGCCompressor(compress_ratio=0.005)
+    values, indices, numel = compressor.compress(compensated_tensor)
+    combined_values, combined_indices = common_gather(values, indices)
+    decompressed_tensor = compressor.decompress((combined_values, combined_indices, numel), tensor.size())
+    state.update_residual(tensor, decompressed_tensor, param_name)
+    
     fut = torch.futures.Future()
     fut.set_result(decompressed_tensor / dist.get_world_size())
     return fut
