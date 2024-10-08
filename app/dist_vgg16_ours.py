@@ -13,7 +13,7 @@ from torch.nn.parallel import DistributedDataParallel
 import sys
 import logging
 
-from app.ccl.topk import topk_comm_hook
+from ccl.topk import topk_comm_hook
 from ccl.compensator import SparsifyCompensator
 from ccl.self_comm import adaptive_bbr_comm_hook, adaptive_sparsify_comm_hook
 
