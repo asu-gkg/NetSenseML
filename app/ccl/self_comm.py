@@ -5,9 +5,6 @@ import logging
 from ccl.compensator import SparsifyCompensator
 from ccl.topk import TopKCompressor
 
-
-
-
 def default_comm_hook(state, bucket):
     tensor = bucket.buffer()
 
@@ -21,45 +18,6 @@ last_rtt = None
 smooth_rtt = None
 alpha = 0.1 # 平滑系数
 compress_ratio = 0.75
-
-def aimd(rtt):
-    global last_rtt, compress_ratio, smooth_rtt
-    if smooth_rtt is None or last_rtt is None:
-        smooth_rtt = rtt
-        last_rtt = rtt
-        return compress_ratio
-    
-    smooth_rtt = alpha * rtt + (1 - alpha) * smooth_rtt
-
-    if smooth_rtt < last_rtt:
-        compress_ratio = min(compress_ratio + 0.001, 1)
-    else:
-        compress_ratio = max(compress_ratio * 0.95, 0.005)
-
-    last_rtt = smooth_rtt
-    return compress_ratio
-
-def adaptive_sparsify_comm_hook(state, bucket):
-    global compress_ratio
-    if compress_ratio == 1:
-        return default_comm_hook(state, bucket)
-
-    # logging.info(f"Compressed ratio: {compress_ratio}, RTT: {last_rtt}")
-
-    tensor = bucket.buffer()
-    compressor = TopKCompressor(compress_ratio)
-    values, indices, numel = compressor.compress(tensor)
-    start_time = time.perf_counter()
-    combined_values, combined_indices = common_gather(values=values, indices=indices)
-    end_time = time.perf_counter()
-    rtt = end_time - start_time
-    compress_ratio = aimd(rtt)
-    # Decompress the tensor with combined values and indices
-    decompressed_tensor = compressor.decompress((combined_values, combined_indices, numel), tensor.size())
-    # Return the decompressed tensor divided by world size
-    fut = torch.futures.Future()
-    fut.set_result(decompressed_tensor / dist.get_world_size())
-    return fut
 
 
 previous_throughput = None
@@ -106,7 +64,7 @@ def update_compression_ratio(rtt, bandwidth, data_in_flight):
 
 def adaptive_bbr_comm_hook(state, bucket):
     global compress_ratio
-    print(compress_ratio)
+    # print(compress_ratio)
     if compress_ratio == 1:
         return default_comm_hook(state, bucket)
 
