@@ -4,30 +4,16 @@ from ccl.gdc_compression import SimpleDGCCompressor
 import time
 import logging
 from ccl.compensator import SparsifyCompensator
+from ccl.topk import TopKCompressor
 
 def sparsify_comm_hook(state, bucket):
     tensor = bucket.buffer()
 
     # Create a compressor and compress the tensor
-    compressor = SimpleDGCCompressor(compress_ratio=0.005)
+    compressor = TopKCompressor(compress_ratio=0.005)
     values, indices, numel = compressor.compress(tensor)
 
-
-    def gather():
-        # Gather values and indices from all processes
-        gathered_values = [torch.zeros_like(values) for _ in range(dist.get_world_size())]
-        gathered_indices = [torch.zeros_like(indices) for _ in range(dist.get_world_size())]
-
-        # All gather values and indices
-        dist.all_gather(gathered_values, values)
-        dist.all_gather(gathered_indices, indices)
-
-        # Combine gathered results
-        combined_values = torch.cat(gathered_values)
-        combined_indices = torch.cat(gathered_indices)
-        return combined_values, combined_indices
-
-    combined_values, combined_indices = gather()
+    combined_values, combined_indices = common_gather()
 
     # Decompress the tensor with combined values and indices
     decompressed_tensor = compressor.decompress((combined_values, combined_indices, numel), tensor.size())
