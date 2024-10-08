@@ -106,7 +106,7 @@ model = l1_unstructured_prune_model(model, amount=0.5)
 model = DistributedDataParallel(model, device_ids=None)
 print("register_comm_hook..")
 compensator = SparsifyCompensator(model)
-model.register_comm_hook(compensator, hook=topk_comm_hook)
+
 
 # 定义损失函数和优化器
 criterion = nn.CrossEntropyLoss()
@@ -133,7 +133,8 @@ for epoch in range(num_epochs):
     total_samples = 0
     progress_bar = tqdm(train_dataloader, desc=f"Epoch {epoch + 1}")  # tqdm 进度条
     train_sampler.set_epoch(epoch)
-    
+    if epoch > 5:
+        model.register_comm_hook(compensator, hook=topk_comm_hook)
     for step, (inputs, labels) in enumerate(progress_bar):
         inputs = inputs.to(device)
         labels = labels.to(device)

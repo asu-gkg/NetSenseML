@@ -16,3 +16,15 @@ class Compressor():
     def aggregate(self, tensors):
         """Aggregate a list of tensors."""
         return sum(tensors)
+    
+    
+
+class Memory():
+    def compensate(self, tensor, name):
+        """Update the tensor with the residuals."""
+        raise NotImplemented("compensate was not implemented.")
+
+    def update(self, tensor, name, compressor, tensor_compressed, ctx):
+        """Update the residuals."""
+        pass
+
