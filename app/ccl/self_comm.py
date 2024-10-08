@@ -1,6 +1,5 @@
 import torch.distributed as dist
 import torch
-from ccl.gdc_compression import SimpleDGCCompressor
 import time
 import logging
 from ccl.compensator import SparsifyCompensator
@@ -48,28 +47,10 @@ def adaptive_sparsify_comm_hook(state, bucket):
     # logging.info(f"Compressed ratio: {compress_ratio}, RTT: {last_rtt}")
 
     tensor = bucket.buffer()
-    compressor = SimpleDGCCompressor(compress_ratio)
+    compressor = TopKCompressor(compress_ratio)
     values, indices, numel = compressor.compress(tensor)
-
-    def gather():
-        length_ = torch.tensor([len(values)], device=tensor.device)
-        dist.all_reduce(length_, op=dist.ReduceOp.MIN)
-
-        gathered_values = []
-        gathered_indices = []
-        for i in range(dist.get_world_size()):
-            gathered_values.append(torch.zeros(length_, dtype=values.dtype, device=tensor.device))
-            gathered_indices.append(torch.zeros(length_, dtype=indices.dtype, device=tensor.device))
-        # All gather values and indices
-        dist.all_gather(gathered_values, values[0: length_])
-        dist.all_gather(gathered_indices, indices[0: length_])
-
-        # Combine gathered results
-        combined_values = torch.cat(gathered_values)
-        combined_indices = torch.cat(gathered_indices)
-        return combined_values, combined_indices
     start_time = time.perf_counter()
-    combined_values, combined_indices = gather()
+    combined_values, combined_indices = common_gather(values=values, indices=indices)
     end_time = time.perf_counter()
     rtt = end_time - start_time
     compress_ratio = aimd(rtt)
@@ -168,7 +149,7 @@ def dgc_comm_hook(state: SparsifyCompensator, bucket: torch.distributed.GradBuck
     
     compensated_tensor = state.compensate(tensor, param_name)
     
-    compressor = SimpleDGCCompressor(compress_ratio=0.005)
+    compressor = TopKCompressor(compress_ratio=0.005)
     values, indices, numel = compressor.compress(compensated_tensor)
     combined_values, combined_indices = common_gather(values, indices)
     decompressed_tensor = compressor.decompress((combined_values, combined_indices, numel), tensor.size())
