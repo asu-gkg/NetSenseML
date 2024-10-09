@@ -8,7 +8,7 @@ def sparsify_comm_hook(state, bucket):
     tensor = bucket.buffer()
 
     # Create a compressor and compress the tensor
-    compressor = SimpleDGCCompressor(compress_ratio=0.005)
+    compressor = SimpleDGCCompressor(compress_ratio=0.01)
     values, indices, numel = compressor.compress(tensor)
 
 
