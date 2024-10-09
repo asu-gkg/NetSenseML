@@ -13,7 +13,10 @@ from torch.nn.parallel import DistributedDataParallel
 import sys
 import logging
 
-from ccl.self_comm import sparsify_comm_hook, adaptive_sparsify_comm_hook, adaptive_bbr_comm_hook
+from ccl.topk import topk_comm_hook
+from ccl.compensator import SparsifyCompensator
+from ccl.self_comm import adaptive_bbr_comm_hook, adaptive_sparsify_comm_hook
+
 from prune.unstructured_prune import l1_unstructured_prune_model
 
 def parse():
@@ -39,7 +42,7 @@ logging.basicConfig(
 
 device = torch.device("cuda")
 dist.init_process_group(backend='nccl', init_method=dist_url, rank=rank, world_size=world_size)
-
+print("connected..")
 data_path = './data/cifar100'
 
 # 数据预处理
@@ -65,12 +68,37 @@ os.makedirs(os.path.dirname(model_path), exist_ok=True)
 # 如果本地有预训练的 VGG16 模型参数，则从本地加载
 if os.path.exists(model_path):
     print("Loading VGG16 model from local file...")
-    model = models.vgg16(pretrained=False)  # 不再下载预训练权重
-    model.load_state_dict(torch.load(model_path))  # 加载本地的权重
+    model = models.vgg16(pretrained=True) 
+    model.load_state_dict(torch.load(model_path)) 
 else:
     print("Downloading and saving VGG16 pretrained model weights...")
     model = models.vgg16(pretrained=True)  # 下载预训练模型
     torch.save(model.state_dict(), model_path)  # 保存预训练权重到本地
+    
+def evaluate(model, test_loader, criterion):
+    model.eval()
+    total_loss = 0.0
+    correct_predictions = 0
+    total_samples = 0
+
+    with torch.no_grad():
+        for inputs, labels in tqdm(test_loader, desc="Evaluating", unit="batch"):
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            
+            # 统计损失和准确率
+            total_loss += loss.item()
+            _, preds = torch.max(outputs, 1)
+            correct_predictions += torch.sum(preds == labels).item()
+            total_samples += labels.size(0)
+    
+    avg_loss = total_loss / len(test_loader)
+    accuracy = correct_predictions / total_samples
+    
+    return avg_loss, accuracy
+
 
 # 替换最后一层分类器以适应 CIFAR-100 (100 类)
 model.classifier[6] = nn.Linear(4096, 100)
@@ -78,8 +106,9 @@ model = model.to(device)
 
 model = l1_unstructured_prune_model(model, amount=0.5)
 model = DistributedDataParallel(model, device_ids=None)
-
-model.register_comm_hook(None, hook=adaptive_bbr_comm_hook)
+print("register_comm_hook..")
+compensator = SparsifyCompensator(model)
+model.register_comm_hook(None, hook=topk_comm_hook)
 
 
 # 定义损失函数和优化器
@@ -90,7 +119,12 @@ optimizer = optim.Adam(model.parameters(), lr=1e-4)
 num_epochs = 10
 lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 
-
+plt.ion()  # 打开交互模式
+fig, ax = plt.subplots(2, 1, figsize=(10, 8))
+epoch_list = []
+loss_list = []
+accuracy_list = []
+time_list = []
 start_time = time.time()
 
 
@@ -101,7 +135,7 @@ for epoch in range(num_epochs):
     correct_predictions = 0
     total_samples = 0
     progress_bar = tqdm(train_dataloader, desc=f"Epoch {epoch + 1}")  # tqdm 进度条
-    
+    train_sampler.set_epoch(epoch)
     for step, (inputs, labels) in enumerate(progress_bar):
         inputs = inputs.to(device)
         labels = labels.to(device)
@@ -129,15 +163,16 @@ for epoch in range(num_epochs):
         progress_bar.set_postfix(loss=avg_loss, accuracy=accuracy)
         if step%50==0:
             logging.info(f'Epoch {epoch + 1}/{step + 1}, loss: {avg_loss:.4f}, accuracy: {accuracy:.4f}')
-
+    
     # 计算每个 epoch 的平均损失和准确率
-    avg_loss = total_loss / len(train_dataloader)
-    accuracy = correct_predictions / total_samples
-    # 学习率调度器更新
+    test_loss, test_accuracy = evaluate(model, test_dataloader, criterion)
+    epoch_time = (time.time() - start_time) / 60  # 时间以分钟计算
+    
     lr_scheduler.step()
     # 每个 epoch 完成后打印损失和准确率
-    logging.info(f"Epoch {epoch + 1}/{num_epochs} finished, Loss: {avg_loss:.4f}, Accuracy: {accuracy:.4f}")
+    logging.info(f"Epoch {epoch + 1}/{num_epochs} finished, Test_Loss: {test_loss:.4f}, Test_Accuracy: {test_accuracy:.4f}")
 
+plt.savefig("vgg16_training_plot.png")  # 保存为 PNG 格式
 
 torch.save(model.state_dict(), "./models/vgg16_cifar100_trained.pth")
 

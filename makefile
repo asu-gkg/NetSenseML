@@ -3,3 +3,6 @@ run-gpt2:
 
 run-dist-vgg16:
 	python3 app/dist_vgg16.py --rank $(rank) --world_size $(world_size) --dist_url tcp://192.168.1.170:4003 --log_file ./results/benchmark_vgg16_ours_${rank}.log
+
+run-dist-vgg16-ours:
+	python3 app/dist_vgg16_ours.py --rank $(rank) --world_size $(world_size) --dist_url tcp://192.168.1.170:4003 --log_file ./results/benchmark_vgg16_ours1_${rank}.log
