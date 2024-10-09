@@ -13,8 +13,6 @@ from torch.nn.parallel import DistributedDataParallel
 import sys
 import logging
 
-from ccl.topk import topk_comm_hook
-from ccl.compensator import SparsifyCompensator
 from ccl.self_comm import adaptive_bbr_comm_hook, adaptive_sparsify_comm_hook
 
 from prune.unstructured_prune import l1_unstructured_prune_model
@@ -107,8 +105,7 @@ model = model.to(device)
 model = l1_unstructured_prune_model(model, amount=0.5)
 model = DistributedDataParallel(model, device_ids=None)
 print("register_comm_hook..")
-compensator = SparsifyCompensator(model)
-model.register_comm_hook(None, hook=topk_comm_hook)
+model.register_comm_hook(None, hook=adaptive_bbr_comm_hook)
 
 
 # 定义损失函数和优化器
