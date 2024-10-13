@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 import torch
 
-model_dir = "./models/gpt2-offline"
+model_dir = "/mnt/nfs/models/gpt2-offline"
 device = torch.device("cuda")
 
 
@@ -32,7 +32,7 @@ gen_text = tokenizer.batch_decode(gen_tokens, skip_special_tokens=True, clean_up
 print("\033[31m" + gen_text + "\033[0m")
 
 # 加载 OpenWebText 数据集
-dataset = load_dataset("openwebtext")
+dataset = load_dataset("/mnt/nfs/openwebtext")
 
 train_dataset = dataset["train"]
 
