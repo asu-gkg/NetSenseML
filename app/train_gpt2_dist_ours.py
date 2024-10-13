@@ -12,6 +12,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
 import argparse
 from ccl.self_comm import adaptive_bbr_comm_hook, adaptive_sparsify_comm_hook
+from datasets import load_from_disk
 
 # 解析命令行参数
 def parse():
@@ -44,8 +45,9 @@ def load_and_cache_dataset(dataset_dir, local_dataset_dir):
         dataset.save_to_disk(local_dataset_dir)
     else:
         print(f"从本地文件夹 {local_dataset_dir} 加载数据集...")
-        dataset = load_dataset('dataset', data_dir=local_dataset_dir)
+        dataset = load_from_disk(local_dataset_dir)  # 使用 load_from_disk 加载本地数据集
     return dataset
+
 
 # 分布式初始化
 def setup_distributed(rank, world_size, dist_url):
