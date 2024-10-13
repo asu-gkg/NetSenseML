@@ -13,16 +13,13 @@ import torch.distributed as dist
 import argparse
 from ccl.self_comm import adaptive_bbr_comm_hook, adaptive_sparsify_comm_hook
 
-
-# 初始化日志记录
-logging.basicConfig(filename='training_log.log', level=logging.INFO)
-
 # 解析命令行参数
 def parse():
     parser = argparse.ArgumentParser(description='PyTorch GPT-2 Training with DistributedDataParallel')
     parser.add_argument('--world_size', type=int, help='Number of processes participating in the job')
     parser.add_argument('--rank', type=int, help='Rank of the current process')
     parser.add_argument('--dist_url', type=str, help='URL to connect to for distributed training')
+    parser.add_argument('--log_file')
     args = parser.parse_args()
     return args
 
@@ -62,6 +59,9 @@ args = parse()
 world_size = args.world_size
 rank = args.rank
 dist_url = args.dist_url
+log_file = args.log_file
+
+logging.basicConfig(filename=log_file, level=logging.INFO)
 
 # 初始化分布式进程组
 setup_distributed(rank, world_size, dist_url)
@@ -70,6 +70,7 @@ setup_distributed(rank, world_size, dist_url)
 model_dir = "/mnt/nfs/models/gpt2-offline"
 local_model_dir = "./local_model"
 model, tokenizer = load_and_cache_model(model_dir, local_model_dir)
+tokenizer.pad_token = tokenizer.eos_token
 
 dataset_dir = "/mnt/nfs/openwebtext"
 local_dataset_dir = "./local_openwebtext"
