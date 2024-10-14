@@ -72,6 +72,7 @@ setup_distributed(rank, world_size, dist_url)
 model_dir = "/mnt/nfs/models/gpt2-offline"
 local_model_dir = "./local_model"
 model, tokenizer = load_and_cache_model(model_dir, local_model_dir)
+# 这里是必须的
 tokenizer.pad_token = tokenizer.eos_token
 
 dataset_dir = "/mnt/nfs/openwebtext"
@@ -79,7 +80,7 @@ local_dataset_dir = "./local_openwebtext"
 dataset = load_and_cache_dataset(dataset_dir, local_dataset_dir)
 train_dataset = dataset["train"]
 
-# 数据预处理
+# 数据预处理    
 def preprocess_function(examples):
     return tokenizer(examples['text'], truncation=True, padding='max_length', max_length=128)
 
