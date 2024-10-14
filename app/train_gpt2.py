@@ -9,17 +9,17 @@ from tqdm import tqdm
 import torch
 
 model_dir = "/mnt/nfs/models/gpt2-offline"
-device = torch.device("cuda")
+device = torch.device("cuda:0")
 
 
-model = GPT2LMHeadModel.from_pretrained(model_dir).to('cuda:0')
+model = GPT2LMHeadModel.from_pretrained(model_dir).to(device)
 
 tokenizer = GPT2TokenizerFast.from_pretrained(model_dir)
 tokenizer.pad_token = tokenizer.eos_token
 
 prompt = "GPT2 is a model developed by OpenAI."
 
-input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to('cuda:0')
+input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
 
 gen_tokens = model.generate(
     input_ids,
