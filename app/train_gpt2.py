@@ -1,5 +1,5 @@
 import math
-from transformers import GPT2LMHeadModel, GPT2Tokenizer, AdamW
+from transformers import GPT2LMHeadModel, GPT2Tokenizer, AdamW, GPT2TokenizerFast
 from datasets import load_dataset
 import torch
 from torch.utils.data import DataLoader
@@ -14,7 +14,7 @@ device = torch.device("cuda")
 
 model = GPT2LMHeadModel.from_pretrained(model_dir).to('cuda:0')
 
-tokenizer = GPT2Tokenizer.from_pretrained(model_dir)
+tokenizer = GPT2TokenizerFast.from_pretrained(model_dir)
 tokenizer.pad_token = tokenizer.eos_token
 
 prompt = "GPT2 is a model developed by OpenAI."
