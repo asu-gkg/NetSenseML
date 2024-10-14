@@ -11,7 +11,7 @@ import os
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
 import argparse
-from ccl.self_comm import adaptive_bbr_comm_hook, adaptive_sparsify_comm_hook
+from ccl.self_comm import adaptive_bbr_comm_hook, adaptive_sparsify_comm_hook, sparsify_comm_hook
 from datasets import load_from_disk
 
 # 解析命令行参数
@@ -96,7 +96,7 @@ tokenized_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask
 device = torch.device(f'cuda:0')
 model = model.to(device)
 model = DDP(model, device_ids=None)
-model.register_comm_hook(None, adaptive_sparsify_comm_hook)
+model.register_comm_hook(None, sparsify_comm_hook)
 
 train_sampler = DistributedSampler(tokenized_dataset, num_replicas=world_size, rank=rank)
 train_dataloader = DataLoader(tokenized_dataset, batch_size=32, sampler=train_sampler)
