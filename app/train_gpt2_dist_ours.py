@@ -90,7 +90,7 @@ tokenized_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask
 # 模型使用 DDP
 device = torch.device(f'cuda:0')
 model = model.to(device)
-model = DDP(model, device_ids=[rank])
+model = DDP(model, device_ids=None)
 model.register_comm_hook(None, adaptive_bbr_comm_hook)
 
 train_sampler = DistributedSampler(tokenized_dataset, num_replicas=world_size, rank=rank)
