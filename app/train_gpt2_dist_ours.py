@@ -88,7 +88,7 @@ tokenized_dataset = train_dataset.map(preprocess_function, batched=True, remove_
 tokenized_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask'])
 
 # 模型使用 DDP
-device = torch.device(f'cuda:{rank}')
+device = torch.device(f'cuda:0')
 model = model.to(device)
 model = DDP(model, device_ids=[rank])
 model.register_comm_hook(None, adaptive_bbr_comm_hook)

@@ -13,3 +13,7 @@ run-dist-vgg16-1g:
 
 run-dist-gpt2-ours:
 	python3 app/train_gpt2_dist_ours.py --rank $(rank) --world_size $(world_size) --dist_url tcp://192.168.1.170:4005 --log_file ./results/benchmark_gpt2_${rank}.log
+
+nas:
+	sudo apt install nfs-common
+	sudo mount 10.4.5.140:/home/asu/PycharmProjects/NetSenseML /mnt/nfs
