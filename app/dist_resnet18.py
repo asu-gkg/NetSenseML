@@ -105,7 +105,7 @@ model = model.to(device)
 
 model = DistributedDataParallel(model, device_ids=None)
 
-model.register_comm_hook(None, hook=adaptive_bbr_comm_hook)
+#model.register_comm_hook(None, hook=adaptive_bbr_comm_hook)
 
 
 # 定义损失函数和优化器
@@ -119,7 +119,7 @@ def custom_adaptive_bbr_comm_hook(state, bucket):
     l1_unstructured_prune_model(model, amount=0.5)  # Prune 20% of the parameters before communication
     return adaptive_bbr_comm_hook(state, bucket)
 
-#model.register_comm_hook(state=None, hook=custom_adaptive_bbr_comm_hook)
+model.register_comm_hook(state=None, hook=custom_adaptive_bbr_comm_hook)
 
 # 定义学习率调度器
 num_epochs = 30
