@@ -10,7 +10,7 @@ run-dist-vgg16-ours:
 run-dist-vgg16-1g:
 	python3 app/dist_vgg16_1g_allreduce.py --rank $(rank) --world_size $(world_size) --dist_url tcp://192.168.1.170:4004 --log_file ./results/benchmark_vgg16_${rank}.log
 
-run-dist-gpt2-topk:
+run-dist-vgg16-topk:
 	python3 app/train_vgg_dist_topk.py --rank $(rank) --world_size $(world_size) --dist_url tcp://192.168.1.170:4005 --log_file ./results/benchmark_vgg_topk_${rank}.log
 
 run-dist-gpt2-ours:
