@@ -25,3 +25,7 @@ run-dist-gpt2-allreduce:
 
 run-dist-gpt2-topk:
 	python3 app/train_gpt2_dist_topk.py --rank $(rank) --world_size $(world_size) --dist_url tcp://192.168.1.170:4005 --log_file ./results/benchmark_gpt2_topk_${rank}.log
+
+
+run-dist-resnet18:
+	python3 app/dist_resnet18.py --rank $(rank) --world_size $(world_size) --dist_url tcp://127.0.0.1:10004  --log_file ./results/benchmark_resnet18_${rank}.log
