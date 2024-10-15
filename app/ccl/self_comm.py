@@ -4,6 +4,12 @@ from ccl.gdc_compression import SimpleDGCCompressor
 import time
 import logging
 
+# 添加写入文件的功能
+def log_compress_ratio_to_file(ratio, filename="compress_ratio_log.txt"):
+    with open(filename, "a") as f:  # 以追加模式写入文件
+        log_entry = f"{time.strftime('%Y-%m-%d %H:%M:%S')} - compress_ratio: {ratio}\n"
+        f.write(log_entry)
+
 def sparsify_comm_hook(state, bucket):
     tensor = bucket.buffer()
 
@@ -101,6 +107,8 @@ def adaptive_sparsify_comm_hook(state, bucket):
     end_time = time.perf_counter()
     rtt = end_time - start_time
     compress_ratio = aimd(rtt)
+    # 记录 compress_ratio 和时间到文件
+    log_compress_ratio_to_file(compress_ratio)
     # Decompress the tensor with combined values and indices
     decompressed_tensor = compressor.decompress((combined_values, combined_indices, numel), tensor.size())
     # Return the decompressed tensor divided by world size

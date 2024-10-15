@@ -1,0 +1,40 @@
+resnet18,cifar10,pretrain=true,
+1、prune→外部，0.5（基于网络测试结果）
+在prune后要加上GSE
+2、要测试一下完整梯度的大小，0.1的梯度量是多少。然后设置带宽是datasize/10
+3、对比算法allreduce不压缩、topk的比例0.001、MLT（在allreduce中加入丢包检测，基于tcp/ip的丢包即丢弃节点）
+
+
+
+带宽如何设置，1Gbps，300Mbps
+
+目前的问题：
+1、topk的参数从0.01降为0.001，带宽设置到很小。（DGC证明梯度有99.9%是冗余的近0值。因此实验传输梯度要低于这个比例才能证明我们方法的有效性）
+时间上，NetSenseML不会比任何人更慢（因为我们是充分利用网络带宽，RTT的最小值。哪怕TOPK设置为0.001，时间也等于NetSenseML）
+2、一定要分布式训练
+
+
+metrics：
+不同方法到达accuracy质变点的时间/ the time to get over specific accuracy value
+最终达到的accuracy/ best accuracy we can get finally
+training throughput / iteration per second
+丢包率
+
+
+balance accuracy and efficiency
+convergence speed
+training throughput
+
+
+
+node1 address 10.120.35.3 port 20001 user d password d LAN ADDRESS 192.168.1.154
+node2 address 10.120.35.3 port 20002 user dd password dd LAN ADDRESS 192.168.1.170
+node3 address 10.120.35.3 port 20003 user ddd password ddd LAN ADDRESS 192.168.1.157
+node4 address 10.120.35.3 port 20004 user dddd password dddd LAN ADDRESS 192.168.1.107
+node5 address 10.120.35.3 port 20005 user ddddd password ddddd LAN ADDRESS 192.168.1.109
+node6 address 10.120.35.3 port 20006 user dddddd password dddddd LAN ADDRESS 192.168.1.232
+node7 address 10.120.35.3 port 20007 user ddddddd password ddddddd LAN ADDRESS 192.168.1.199
+node8 address 10.120.35.3 port 20008 user dddddddd password dddddddd LAN ADDRESS 192.168.1.248
+1. ssh dd@10.120.35.3 -p 20002
+git pull # 更新你的代码
+make run-dist 
