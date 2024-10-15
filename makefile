@@ -28,4 +28,4 @@ run-dist-gpt2-topk:
 
 
 run-dist-resnet18:
-	python3 app/dist_resnet18.py --rank $(rank) --world_size $(world_size) --dist_url tcp://127.0.0.1:10004  --log_file ./results/benchmark_resnet18_${rank}.log
+	python3 app/dist_resnet18.py --rank $(rank) --world_size $(world_size) --dist_url tcp://192.168.1.170:8000  --log_file ./results/benchmark_resnet18_${rank}.log
