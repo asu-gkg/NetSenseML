@@ -79,7 +79,7 @@ model = model.to(device)
 model = l1_unstructured_prune_model(model, amount=0.5)
 model = DistributedDataParallel(model, device_ids=None)
 
-model.register_comm_hook(None, hook=adaptive_bbr_comm_hook)
+# model.register_comm_hook(None, hook=adaptive_bbr_comm_hook)
 
 
 # 定义损失函数和优化器

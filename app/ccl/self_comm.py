@@ -153,7 +153,7 @@ def update_compression_ratio(rtt, bandwidth, data_in_flight):
 
 def adaptive_bbr_comm_hook(state, bucket):
     global compress_ratio
-    print(compress_ratio)
+    # print(compress_ratio)
     if compress_ratio == 1:
         return default_comm_hook(state, bucket)
 
