@@ -76,23 +76,18 @@ else:
 model.classifier[6] = nn.Linear(4096, 100)
 model = model.to(device)
 
-model = l1_unstructured_prune_model(model, amount=0.5)
 model = DistributedDataParallel(model, device_ids=None)
-
-# model.register_comm_hook(None, hook=adaptive_bbr_comm_hook)
-
 
 # 定义损失函数和优化器
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
 # 定义学习率调度器
-num_epochs = 10
+num_epochs = 150
 lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 
 
 start_time = time.time()
-
 
 # 训练循环
 model.train()
@@ -127,9 +122,6 @@ for epoch in range(num_epochs):
 
         # tqdm 进度条显示
         progress_bar.set_postfix(loss=avg_loss, accuracy=accuracy)
-        if step%50==0:
-            logging.info(f'Epoch {epoch + 1}/{step + 1}, loss: {avg_loss:.4f}, accuracy: {accuracy:.4f}')
-
     # 计算每个 epoch 的平均损失和准确率
     avg_loss = total_loss / len(train_dataloader)
     accuracy = correct_predictions / total_samples
