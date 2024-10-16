@@ -26,9 +26,11 @@ def parse():
     return args
 
 args = parse()
-world_size = args.world_size
-rank = args.rank
-dist_url = args.dist_url
+rank = int(os.environ['RANK'])
+world_size = int(os.environ['WORLD_SIZE'])
+
+# dist_url（rendezvous 地址）可以通过环境变量传递或手动指定
+dist_url = "tcp://192.168.1.154:8003"
 
 logging.basicConfig(
     filename=args.log_file,  # 输出日志到文件
@@ -105,7 +107,7 @@ model = model.to(device)
 
 model = DistributedDataParallel(model, device_ids=None)
 
-#model.register_comm_hook(None, hook=adaptive_bbr_comm_hook)
+# model.register_comm_hook(None, hook=adaptive_bbr_comm_hook)
 
 
 # 定义损失函数和优化器
@@ -131,13 +133,14 @@ epoch_list = []
 loss_list = []
 accuracy_list = []
 time_list = []
-start_time = time.time()
+
 
 
 # 训练循环
 model.train()
 for epoch in range(num_epochs):
     total_loss = 0  # 用于累加每个 epoch 的总损失
+    start_time = time.time()
     correct_predictions = 0
     total_samples = 0
     progress_bar = tqdm(train_dataloader, desc=f"Epoch {epoch + 1}")  # tqdm 进度条
@@ -187,12 +190,17 @@ for epoch in range(num_epochs):
     
     # 计算每个 epoch 的平均损失和准确率
     test_loss, test_accuracy = evaluate(model, test_dataloader, criterion)
-    epoch_time = (time.time() - start_time) / 60  # 时间以分钟计算
-    
+    epoch_time = (time.time() - start_time)
+    throughput = total_samples / epoch_time  # 每秒处理样本数
     lr_scheduler.step()
     # 每个 epoch 完成后打印损失和准确率
-    logging.info(f"Epoch {epoch + 1}/{num_epochs} finished, Test_Loss: {test_loss:.4f}, Test_Accuracy: {test_accuracy:.4f}")
-
+    logging.info(f"Epoch {epoch + 1}/{num_epochs} finished, "
+                 f"Test_Loss: {test_loss:.4f}, Test_Accuracy: {test_accuracy:.4f}, "
+                 f"Training Throughput: {throughput:.2f} samples/sec")
+    print(f"Epoch {epoch + 1}/{num_epochs} finished, "
+                 f"Test_Loss: {test_loss:.4f}, Test_Accuracy: {test_accuracy:.4f}, "
+                 f"Training Throughput: {throughput:.2f} samples/sec")
+    
 plt.savefig("resnet18_training_plot.png")  # 保存为 PNG 格式
 
 torch.save(model.state_dict(), "./models/resnet18_cifar100_trained.pth")

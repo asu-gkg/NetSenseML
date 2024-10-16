@@ -14,7 +14,7 @@ def sparsify_comm_hook(state, bucket):
     tensor = bucket.buffer()
 
     # Create a compressor and compress the tensor
-    compressor = SimpleDGCCompressor(compress_ratio=0.01)
+    compressor = SimpleDGCCompressor(compress_ratio=0.1)
     values, indices, numel = compressor.compress(tensor)
 
 
@@ -67,9 +67,9 @@ def aimd(rtt):
     smooth_rtt = alpha * rtt + (1 - alpha) * smooth_rtt
 
     if smooth_rtt < last_rtt:
-        compress_ratio = min(compress_ratio + 0.001, 1)
+        compress_ratio = min(compress_ratio + 0.01, 1)
     else:
-        compress_ratio = max(compress_ratio * 0.95, 0.005)
+        compress_ratio = max(compress_ratio * 0.99, 0.1)
 
     last_rtt = smooth_rtt
     return compress_ratio
@@ -153,7 +153,7 @@ def update_compression_ratio(rtt, bandwidth, data_in_flight):
     
     # based on BDP to change compression ratio
     if data_in_flight > bdp * 0.9:
-        compress_ratio = max(0.005, compress_ratio * 0.95)
+        compress_ratio = max(0.01, compress_ratio * 0.95)
     else:
         compress_ratio = min(1, compress_ratio + 0.001)
     

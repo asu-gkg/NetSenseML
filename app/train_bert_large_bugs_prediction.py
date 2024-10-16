@@ -6,6 +6,26 @@ from transformers import BertTokenizer, BertForSequenceClassification, AdamW, ge
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 import datasets
+import argparse
+import logging
+import time
+import os
+
+def parse():
+    parser = argparse.ArgumentParser(description='PyTorch Training')
+    parser.add_argument('--log_file', type=str, help='log file path')
+    args = parser.parse_args()
+    return args
+
+args = parse()
+
+
+logging.basicConfig(
+    filename=args.log_file,  # 输出日志到文件
+    filemode='a',  # 追加模式
+    format='%(asctime)s - %(levelname)s - %(message)s',  # 日志格式
+    level=logging.INFO  # 日志级别
+)
 
 # Device setup
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -78,7 +98,7 @@ def compute_accuracy(preds, labels):
 # Training loop
 for epoch in range(epochs):
     print(f'Epoch {epoch+1}/{epochs}')
-    
+    start_time = time.time()
     model.train()
     total_loss = 0
     correct_predictions = 0
@@ -110,8 +130,7 @@ for epoch in range(epochs):
         progress_bar.set_postfix(loss=f'{avg_loss:.3f}', accuracy=f'{accuracy:.3f}')
 
     avg_train_loss = total_loss / len(dataloader)
-    print(f'Training loss: {avg_train_loss:.4f}')
-
+    
     # Validation
     model.eval()
     eval_loss = 0
@@ -132,9 +151,11 @@ for epoch in range(epochs):
 
     avg_val_loss = eval_loss / len(val_dataloader)
     avg_val_accuracy = eval_accuracy / len(val_dataloader)
-    
-    print(f'Validation loss: {avg_val_loss:.4f}')
-    print(f'Validation accuracy: {avg_val_accuracy:.4f}')
+    epoch_time = time.time() - start_time
+    throughput = total_samples / epoch_time  # 每秒处理样本数
+    logging.info(f"Epoch {epoch + 1}/{epochs} finished, "
+                 f"Test_Loss: {avg_val_loss:.4f}, Test_Accuracy: {avg_val_accuracy:.4f}, "
+                 f"Training Throughput: {throughput:.2f} samples/sec")
 
 # Save model
 model.save_pretrained('./bert-bug-prediction')

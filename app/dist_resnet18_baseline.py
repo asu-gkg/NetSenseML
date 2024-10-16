@@ -12,13 +12,12 @@ import argparse
 from torch.nn.parallel import DistributedDataParallel
 import sys
 import logging
-import time
 
 from ccl.self_comm import sparsify_comm_hook, adaptive_sparsify_comm_hook, adaptive_bbr_comm_hook
 from prune.unstructured_prune import l1_unstructured_prune_model
 
 def parse():
-    parser = argparse.ArgumentParser(description='PyTorch VGG16 Training')
+    parser = argparse.ArgumentParser(description='PyTorch RESNET18 Training')
     parser.add_argument('--world_size', type=int, help='Number of processes participating in the job')
     parser.add_argument('--rank', type=int, help='Rank of the current process')
     parser.add_argument('--dist_url', type=str, help='URL to connect to for distributed')
@@ -28,7 +27,7 @@ def parse():
 
 args = parse()
 world_size = args.world_size
-rank = args.rank
+rank = int(args.rank)
 dist_url = args.dist_url
 
 logging.basicConfig(
@@ -45,7 +44,7 @@ data_path = './data/cifar100'
 
 # 数据预处理
 transform = transforms.Compose([
-    transforms.Resize((224, 224)),  # 调整 CIFAR-100 图像大小为 VGG16 所需的 224x224
+    transforms.Resize((224, 224)),  # 调整 CIFAR-100 图像大小为 resnet18 所需的 224x224
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
@@ -59,43 +58,26 @@ train_dataloader = DataLoader(train_dataset, batch_size=32, sampler=train_sample
 test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
 # 定义模型保存路径
-model_path = './models/vgg16_cifar100_pretrained.pth'
+model_path = './models/resnet18_cifar100_pretrained.pth'
 # 检查保存目录是否存在，如果不存在则创建
 os.makedirs(os.path.dirname(model_path), exist_ok=True)
 
-# 如果本地有预训练的 VGG16 模型参数，则从本地加载
+# 如果本地有预训练的 resnet18 模型参数，则从本地加载
 if os.path.exists(model_path):
-    print("Loading VGG16 model from local file...")
-    model = models.vgg16(pretrained=False)  # 不再下载预训练权重
+    print("Loading RESNET18 model from local file...")
+    model = models.resnet18(pretrained=False)  # 不再下载预训练权重
     model.load_state_dict(torch.load(model_path))  # 加载本地的权重
 else:
-    print("Downloading and saving VGG16 pretrained model weights...")
-    model = models.vgg16(pretrained=True)  # 下载预训练模型
+    print("Downloading and saving RESNET18 pretrained model weights...")
+    model = models.resnet18(pretrained=True)  # 下载预训练模型
     torch.save(model.state_dict(), model_path)  # 保存预训练权重到本地
-
-# 替换最后一层分类器以适应 CIFAR-100 (100 类)
-model.classifier[6] = nn.Linear(4096, 100)
-model = model.to(device)
-
-model = DistributedDataParallel(model, device_ids=None)
-
-# 定义损失函数和优化器
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=1e-4)
-
-# 定义学习率调度器
-num_epochs = 150
-lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
-
-
-
-
+    
 def evaluate(model, test_loader, criterion):
     model.eval()
     total_loss = 0.0
     correct_predictions = 0
     total_samples = 0
-    
+
     with torch.no_grad():
         for inputs, labels in tqdm(test_loader, desc="Evaluating", unit="batch"):
             inputs = inputs.to(device)
@@ -114,6 +96,36 @@ def evaluate(model, test_loader, criterion):
     
     return avg_loss, accuracy
 
+
+# 加载 ResNet18 预训练模型，并替换最后一层分类器以适应 CIFAR-100 (100 类)
+# model = models.resnet18(pretrained=False)
+model.fc = nn.Linear(model.fc.in_features, 100)  # 替换全连接层，适应 CIFAR-100
+model = model.to(device)
+#model,prune_grad_mask = l1_unstructured_prune_model(model, amount=0.5)
+
+model = DistributedDataParallel(model, device_ids=None)
+
+#model.register_comm_hook(None, hook=adaptive_bbr_comm_hook)
+
+
+# 定义损失函数和优化器
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=1e-4)
+
+
+# 定义学习率调度器
+num_epochs = 30
+lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
+
+plt.ion()  # 打开交互模式
+fig, ax = plt.subplots(2, 1, figsize=(10, 8))
+epoch_list = []
+loss_list = []
+accuracy_list = []
+time_list = []
+
+
+
 # 训练循环
 model.train()
 for epoch in range(num_epochs):
@@ -122,7 +134,6 @@ for epoch in range(num_epochs):
     correct_predictions = 0
     total_samples = 0
     progress_bar = tqdm(train_dataloader, desc=f"Epoch {epoch + 1}")  # tqdm 进度条
-    start_time = time.time()  # 记录 epoch 开始时间
     
     for step, (inputs, labels) in enumerate(progress_bar):
         inputs = inputs.to(device)
@@ -135,8 +146,8 @@ for epoch in range(num_epochs):
         # 反向传播并更新参数
         optimizer.zero_grad()
         loss.backward()
-        optimizer.step()
-
+        
+        optimizer.step()                
         # 统计损失和准确率
         total_loss += loss.item()
         _, preds = torch.max(outputs, 1)
@@ -149,26 +160,20 @@ for epoch in range(num_epochs):
 
         # tqdm 进度条显示
         progress_bar.set_postfix(loss=avg_loss, accuracy=accuracy)
-        
-    # 计算每个 epoch 的总耗时
-    epoch_time = time.time() - start_time  # 秒
-    throughput = total_samples / epoch_time  # 每秒处理样本数
-    # 计算每个 epoch 的平均损失和准确率
+        # logging.info(f'Epoch {epoch + 1}/{step + 1}, loss: {avg_loss:.4f}, accuracy: {accuracy:.4f}')
     
-    avg_loss = total_loss / len(train_dataloader)
-    accuracy = correct_predictions / total_samples
-    # 学习率调度器更新
-    lr_scheduler.step()
     # 计算每个 epoch 的平均损失和准确率
     test_loss, test_accuracy = evaluate(model, test_dataloader, criterion)
-    
+    epoch_time = (time.time() - start_time) 
+    throughput = total_samples / epoch_time  # 每秒处理样本数
     lr_scheduler.step()
     # 每个 epoch 完成后打印损失和准确率
-    # 打印每个 epoch 的训练吞吐量
     logging.info(f"Epoch {epoch + 1}/{num_epochs} finished, "
                  f"Test_Loss: {test_loss:.4f}, Test_Accuracy: {test_accuracy:.4f}, "
                  f"Training Throughput: {throughput:.2f} samples/sec")
+    
+plt.savefig("resnet18_training_plot.png")  # 保存为 PNG 格式
 
-torch.save(model.state_dict(), "./models/vgg16_cifar100_trained.pth")
+torch.save(model.state_dict(), "./models/resnet18_cifar100_trained.pth")
 
-print("VGG16 模型训练完成并保存。")
+print("resnet18 模型训练完成并保存。")

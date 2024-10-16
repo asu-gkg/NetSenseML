@@ -91,12 +91,13 @@ num_epochs = 10
 lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 
 
-start_time = time.time()
+
 
 
 # 训练循环
 model.train()
 for epoch in range(num_epochs):
+    start_time = time.time()
     total_loss = 0  # 用于累加每个 epoch 的总损失
     correct_predictions = 0
     total_samples = 0

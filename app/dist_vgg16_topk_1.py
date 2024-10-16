@@ -78,6 +78,7 @@ model.classifier[6] = nn.Linear(4096, 100)
 model = model.to(device)
 
 model = DistributedDataParallel(model, device_ids=None)
+model.register_comm_hook(None, hook=sparsify_comm_hook)
 
 # 定义损失函数和优化器
 criterion = nn.CrossEntropyLoss()
@@ -88,7 +89,7 @@ num_epochs = 150
 lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 
 
-
+start_time = time.time()
 
 def evaluate(model, test_loader, criterion):
     model.eval()
@@ -117,7 +118,6 @@ def evaluate(model, test_loader, criterion):
 # 训练循环
 model.train()
 for epoch in range(num_epochs):
-    start_time = time.time()
     total_loss = 0  # 用于累加每个 epoch 的总损失
     correct_predictions = 0
     total_samples = 0
@@ -161,6 +161,7 @@ for epoch in range(num_epochs):
     lr_scheduler.step()
     # 计算每个 epoch 的平均损失和准确率
     test_loss, test_accuracy = evaluate(model, test_dataloader, criterion)
+    epoch_time = (time.time() - start_time) / 60  # 时间以分钟计算
     
     lr_scheduler.step()
     # 每个 epoch 完成后打印损失和准确率

@@ -6,9 +6,18 @@ from transformers import BertTokenizer, BertForSequenceClassification, AdamW, ge
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 import datasets
+import logging
 
 # Device setup
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+logging.basicConfig(
+    filename=args.log_file,  # 输出日志到文件
+    filemode='a',  # 追加模式
+    format='%(asctime)s - %(levelname)s - %(message)s',  # 日志格式
+    level=logging.INFO  # 日志级别
+)
+
 
 def load_dataset():
     # Load the dataset
