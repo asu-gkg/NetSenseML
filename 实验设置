@@ -30,7 +30,7 @@ training throughput
 node1 address 10.120.35.3 port 20001 user d password d LAN ADDRESS 192.168.1.154
 node2 address 10.120.35.3 port 20002 user dd password dd LAN ADDRESS 192.168.1.170
 node3 address 10.120.35.3 port 20003 user ddd password ddd LAN ADDRESS 192.168.1.157
-node4 address 10.120.35.3 port 20004 user dddd password dddd LAN ADDRESS 192.168.1.107
+node4 address 10.120.35.3 port 20004 user dddd password dddd LAN ADDRESS 192.168.1.108
 node5 address 10.120.35.3 port 20005 user ddddd password ddddd LAN ADDRESS 192.168.1.109
 node6 address 10.120.35.3 port 20006 user dddddd password dddddd LAN ADDRESS 192.168.1.232
 node7 address 10.120.35.3 port 20007 user ddddddd password ddddddd LAN ADDRESS 192.168.1.199

@@ -118,6 +118,13 @@ for epoch in range(epochs):
         logits = outputs.logits
 
         loss.backward()
+        total_grad_count = 0
+        for name, param in model.named_parameters():
+            if param.grad is not None:
+                total_grad_count += param.grad.numel()
+
+        print(f"Step total gradient count: {total_grad_count}")
+
         optimizer.step()
         scheduler.step()
 

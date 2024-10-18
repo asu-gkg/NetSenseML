@@ -4,11 +4,11 @@ import subprocess
 nodes = {
     "192.168.1.154": {"user": "d", "password": "d"},
     "192.168.1.157": {"user": "ddd", "password": "ddd"},
-    "192.168.1.107": {"user": "dddd", "password": "dddd"},
-    "192.168.1.109": {"user": "ddddd", "password": "ddddd"},
+    "192.168.1.108": {"user": "dddd", "password": "dddd"},
+    "192.168.1.107": {"user": "ddddd", "password": "ddddd"},
     "192.168.1.232": {"user": "dddddd", "password": "dddddd"},
     "192.168.1.199": {"user": "ddddddd", "password": "ddddddd"},
-    "192.168.1.249": {"user": "dddddddd", "password": "dddddddd"}
+    "192.168.1.248": {"user": "dddddddd", "password": "dddddddd"}
 }
 
 # 本地需要同步的目录

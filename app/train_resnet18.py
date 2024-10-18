@@ -11,9 +11,33 @@ from tqdm import tqdm
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # 加载 ResNet18 预训练模型，并替换最后一层分类器以适应 CIFAR-100 (100 类)
-model = models.resnet18(pretrained=False)
+model = models.resnet101(pretrained=True)
 model.fc = nn.Linear(model.fc.in_features, 100)  # 替换全连接层，适应 CIFAR-100
 model = model.to(device)
+
+def evaluate(model, test_loader, criterion):
+    model.eval()
+    total_loss = 0.0
+    correct_predictions = 0
+    total_samples = 0
+    
+    with torch.no_grad():
+        for inputs, labels in tqdm(test_loader, desc="Evaluating", unit="batch"):
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            
+            # 统计损失和准确率
+            total_loss += loss.item()
+            _, preds = torch.max(outputs, 1)
+            correct_predictions += torch.sum(preds == labels).item()
+            total_samples += labels.size(0)
+    
+    avg_loss = total_loss / len(test_loader)
+    accuracy = correct_predictions / total_samples
+    
+    return avg_loss, accuracy
 
 # 数据预处理
 transform = transforms.Compose([
@@ -81,7 +105,7 @@ for epoch in range(epochs):
     avg_loss = total_loss / len(train_dataloader)
     accuracy = correct_predictions / total_samples
     epoch_time = (time.time() - start_time) / 60  # 时间以分钟计算
-
+    test_loss, test_accuracy = evaluate(model, train_dataloader, criterion)
     # 将数据保存到列表中
     epoch_list.append(epoch + 1)
     loss_list.append(avg_loss)

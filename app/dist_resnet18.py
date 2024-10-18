@@ -10,8 +10,11 @@ import matplotlib.pyplot as plt
 import torch.distributed as dist
 import argparse
 from torch.nn.parallel import DistributedDataParallel
+from torch.distributed.algorithms.ddp_comm_hooks import default_hooks
+
 import sys
 import logging
+
 
 from ccl.self_comm import sparsify_comm_hook, adaptive_sparsify_comm_hook, adaptive_bbr_comm_hook
 from prune.unstructured_prune import l1_unstructured_prune_model
@@ -79,7 +82,7 @@ def evaluate(model, test_loader, criterion):
     total_loss = 0.0
     correct_predictions = 0
     total_samples = 0
-
+    
     with torch.no_grad():
         for inputs, labels in tqdm(test_loader, desc="Evaluating", unit="batch"):
             inputs = inputs.to(device)
@@ -105,7 +108,7 @@ model.fc = nn.Linear(model.fc.in_features, 100)  # 替换全连接层，适应 C
 model = model.to(device)
 #model,prune_grad_mask = l1_unstructured_prune_model(model, amount=0.5)
 
-model = DistributedDataParallel(model, device_ids=None)
+model = DistributedDataParallel(model, device_ids=[0])
 
 # model.register_comm_hook(None, hook=adaptive_bbr_comm_hook)
 
@@ -116,8 +119,23 @@ optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
 
 # Register adaptive BBR communication hook with pruning
+
+def sync_test_accuracy(current_accuracy):
+    """通过all_reduce同步各节点的验证精度"""
+    tensor = torch.tensor(current_accuracy).cuda()  # 将当前节点的 test_accuracy 转换为 tensor 并放到 GPU 上
+    dist.all_reduce(tensor, op=dist.ReduceOp.MAX)  # 通过 all_reduce 汇总所有节点的精度
+    accuracy = tensor.item()
+    return accuracy
+last_acc = 0
+cur_acc = 0
+use_allreduce = False
 def custom_adaptive_bbr_comm_hook(state, bucket):
-    global model
+    global use_allreduce
+    if last_acc > cur_acc or use_allreduce:
+        if use_allreduce is False:
+            print('set use_allreduce=1')
+        use_allreduce = True
+        return default_hooks.allreduce_hook(state, bucket)
     l1_unstructured_prune_model(model, amount=0.5)  # Prune 20% of the parameters before communication
     return adaptive_bbr_comm_hook(state, bucket)
 
@@ -135,19 +153,20 @@ accuracy_list = []
 time_list = []
 
 
-
 # 训练循环
 model.train()
 for epoch in range(num_epochs):
+    
     total_loss = 0  # 用于累加每个 epoch 的总损失
     start_time = time.time()
     correct_predictions = 0
     total_samples = 0
     progress_bar = tqdm(train_dataloader, desc=f"Epoch {epoch + 1}")  # tqdm 进度条
-    
+    train_sampler.set_epoch(epoch)
     for step, (inputs, labels) in enumerate(progress_bar):
         inputs = inputs.to(device)
         labels = labels.to(device)
+        
 
         # 前向传播
         outputs = model(inputs)
@@ -190,15 +209,20 @@ for epoch in range(num_epochs):
     
     # 计算每个 epoch 的平均损失和准确率
     test_loss, test_accuracy = evaluate(model, test_dataloader, criterion)
+    
+    last_acc = cur_acc
+    cur_acc = sync_test_accuracy(test_accuracy)
     epoch_time = (time.time() - start_time)
     throughput = total_samples / epoch_time  # 每秒处理样本数
     lr_scheduler.step()
     # 每个 epoch 完成后打印损失和准确率
     logging.info(f"Epoch {epoch + 1}/{num_epochs} finished, "
                  f"Test_Loss: {test_loss:.4f}, Test_Accuracy: {test_accuracy:.4f}, "
+                 f"Max Accuracy: {cur_acc:.4f}"
                  f"Training Throughput: {throughput:.2f} samples/sec")
     print(f"Epoch {epoch + 1}/{num_epochs} finished, "
-                 f"Test_Loss: {test_loss:.4f}, Test_Accuracy: {test_accuracy:.4f}, "
+                 f"Test_Loss: {test_loss:.4f}, cur_acc: {cur_acc:.4f}, "
+                 f"Max Accuracy: {cur_acc:.4f}, "
                  f"Training Throughput: {throughput:.2f} samples/sec")
     
 plt.savefig("resnet18_training_plot.png")  # 保存为 PNG 格式

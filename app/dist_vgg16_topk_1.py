@@ -29,7 +29,7 @@ def parse():
 args = parse()
 world_size = args.world_size
 rank = args.rank
-dist_url = args.dist_url
+dist_url = "tcp://192.168.1.154:8003"
 
 logging.basicConfig(
     filename=args.log_file,  # 输出日志到文件

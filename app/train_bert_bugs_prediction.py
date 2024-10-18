@@ -8,8 +8,17 @@ from tqdm import tqdm
 import datasets
 import logging
 
-# Device setup
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+import argparse
+
+
+def parse():
+    parser = argparse.ArgumentParser(description='PyTorch Training')
+    parser.add_argument('--log_file', type=str, help='log file path')
+    args = parser.parse_args()
+    return args
+
+args = parse()
+
 
 logging.basicConfig(
     filename=args.log_file,  # 输出日志到文件
@@ -17,6 +26,9 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',  # 日志格式
     level=logging.INFO  # 日志级别
 )
+
+# Device setup
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def load_dataset():
@@ -101,6 +113,7 @@ for epoch in range(epochs):
         input_ids = batch['input_ids'].to(device)
         attention_mask = batch['attention_mask'].to(device)
         labels = batch['labels'].to(device)
+        print(labels)
 
         model.zero_grad()
 

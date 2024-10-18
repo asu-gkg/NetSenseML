@@ -163,7 +163,7 @@ for epoch in range(num_epochs):
     
     # 计算每个 epoch 的平均损失和准确率
     test_loss, test_accuracy = evaluate(model, test_dataloader, criterion)
-    epoch_time = (time.time() - start_time) / 60  # 时间以分钟计算
+    epoch_time = (time.time() - start_time)
     
     lr_scheduler.step()
     # 每个 epoch 完成后打印损失和准确率

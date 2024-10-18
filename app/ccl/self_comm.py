@@ -3,13 +3,10 @@ import torch
 from ccl.gdc_compression import SimpleDGCCompressor
 import time
 import logging
+import random
+import os 
 
-# 添加写入文件的功能
-def log_compress_ratio_to_file(ratio, filename="compress_ratio_log.txt"):
-    with open(filename, "a") as f:  # 以追加模式写入文件
-        log_entry = f"{time.strftime('%Y-%m-%d %H:%M:%S')} - compress_ratio: {ratio}\n"
-        f.write(log_entry)
-
+rank = int(os.environ['RANK'])
 def sparsify_comm_hook(state, bucket):
     tensor = bucket.buffer()
 
@@ -65,14 +62,16 @@ def aimd(rtt):
         return compress_ratio
     
     smooth_rtt = alpha * rtt + (1 - alpha) * smooth_rtt
-
+    random_factor = random.uniform(0.1, 0.5)
     if smooth_rtt < last_rtt:
-        compress_ratio = min(compress_ratio + 0.01, 1)
+        compress_ratio = min(compress_ratio + random_factor, 0.99)
     else:
         compress_ratio = max(compress_ratio * 0.99, 0.1)
 
     last_rtt = smooth_rtt
     return compress_ratio
+
+
 
 def adaptive_sparsify_comm_hook(state, bucket):
     global compress_ratio
@@ -107,8 +106,7 @@ def adaptive_sparsify_comm_hook(state, bucket):
     end_time = time.perf_counter()
     rtt = end_time - start_time
     compress_ratio = aimd(rtt)
-    # 记录 compress_ratio 和时间到文件
-    log_compress_ratio_to_file(compress_ratio)
+
     # Decompress the tensor with combined values and indices
     decompressed_tensor = compressor.decompress((combined_values, combined_indices, numel), tensor.size())
     # Return the decompressed tensor divided by world size
@@ -149,26 +147,32 @@ def update_compression_ratio(rtt, bandwidth, data_in_flight):
     global compress_ratio, max_bandwidth, min_rtt
     if min_rtt==float('inf') or max_bandwidth==0:
         return compress_ratio
-    bdp = calculate_bdp(max_bandwidth, min_rtt)
     
+    bdp = calculate_bdp(max_bandwidth, min_rtt)
     # based on BDP to change compression ratio
     if data_in_flight > bdp * 0.9:
-        compress_ratio = max(0.01, compress_ratio * 0.95)
+        compress_ratio = max(0.001, compress_ratio * 0.95)
     else:
-        compress_ratio = min(1, compress_ratio + 0.001)
+        compress_ratio = min(0.99, compress_ratio + 0.001)
     
     return compress_ratio
 
-def adaptive_bbr_comm_hook(state, bucket):
-    global compress_ratio
-    # print(compress_ratio)
-    if compress_ratio == 1:
-        return default_comm_hook(state, bucket)
+record_ratio_interval = 20 # 隔20s记录一次ratio
+last_time_record_ratio = 0
 
+def adaptive_bbr_comm_hook(state, bucket):
+    global compress_ratio, last_time_record_ratio
+    # print(compress_ratio)
+    # if compress_ratio == 1:
+    #     return default_comm_hook(state, bucket)
+    if time.time() - last_time_record_ratio > record_ratio_interval:
+        last_time_record_ratio = time.time()
+        if rank==1:
+            logging.info(f"Compressed ratio: {compress_ratio}, RTT: {last_rtt}")
     tensor = bucket.buffer()
     compressor = SimpleDGCCompressor(compress_ratio)
     values, indices, numel = compressor.compress(tensor)
-
+    # print(compress_ratio)
     def gather():
         length_ = torch.tensor([len(values)], device=tensor.device)
         dist.all_reduce(length_, op=dist.ReduceOp.MIN)
@@ -186,21 +190,18 @@ def adaptive_bbr_comm_hook(state, bucket):
         return combined_values, combined_indices
 
     start_time = time.perf_counter()
-    combined_values, combined_indices = gather()
-    end_time = time.perf_counter()
     
+    combined_values, combined_indices = gather()
+    decompressed_tensor = compressor.decompress((combined_values, combined_indices, numel), tensor.size())
+    fut = torch.futures.Future()
+    fut.set_result((decompressed_tensor + tensor) / 2)
+    
+    end_time = time.perf_counter()
     rtt = end_time - start_time
     data_size = combined_values.numel() * combined_values.element_size()
     bandwidth = estimate_bandwidth(data_size, rtt)
     data_in_flight = data_size  # 在途数据量等于传输的数据量
-
     elapsed_time = end_time % rtt_window
-    
     update_min_rtt_and_bandwidth(rtt, bandwidth, elapsed_time)
-
     compress_ratio = update_compression_ratio(rtt, bandwidth, data_in_flight)
-
-    decompressed_tensor = compressor.decompress((combined_values, combined_indices, numel), tensor.size())
-    fut = torch.futures.Future()
-    fut.set_result(decompressed_tensor / dist.get_world_size())
     return fut

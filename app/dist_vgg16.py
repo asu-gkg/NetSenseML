@@ -29,7 +29,7 @@ def parse():
 args = parse()
 world_size = args.world_size
 rank = args.rank
-dist_url = args.dist_url
+dist_url = "tcp://192.168.1.154:8003"
 
 logging.basicConfig(
     filename=args.log_file,  # 输出日志到文件
@@ -88,7 +88,7 @@ num_epochs = 150
 lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 
 
-
+start_time = time.time()
 
 def evaluate(model, test_loader, criterion):
     model.eval()
@@ -117,7 +117,6 @@ def evaluate(model, test_loader, criterion):
 # 训练循环
 model.train()
 for epoch in range(num_epochs):
-    start_time = time.time()
     total_loss = 0  # 用于累加每个 epoch 的总损失
     correct_predictions = 0
     total_samples = 0
@@ -166,6 +165,9 @@ for epoch in range(num_epochs):
     # 每个 epoch 完成后打印损失和准确率
     # 打印每个 epoch 的训练吞吐量
     logging.info(f"Epoch {epoch + 1}/{num_epochs} finished, "
+                 f"Test_Loss: {test_loss:.4f}, Test_Accuracy: {test_accuracy:.4f}, "
+                 f"Training Throughput: {throughput:.2f} samples/sec")
+    print(f"Epoch {epoch + 1}/{num_epochs} finished, "
                  f"Test_Loss: {test_loss:.4f}, Test_Accuracy: {test_accuracy:.4f}, "
                  f"Training Throughput: {throughput:.2f} samples/sec")
 

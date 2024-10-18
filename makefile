@@ -1,17 +1,18 @@
 run-bert:
-	python3 app/train_bert_large_bugs_prediction.py --log_file ./results/benchmark_bert.log
+	python3 app/train_bert_bugs_prediction.py --log_file ./results/benchmark_bert.log
+# python3 app/train_bert_large_bugs_prediction.py --log_file ./results/benchmark_bert.log
 
 run-dist-vgg16:
-	python3 app/dist_vgg16.py --rank $(rank) --world_size $(world_size) --dist_url tcp://192.168.1.170:4003 --log_file ./results/benchmark_vgg16_${rank}.log
+	torchrun --nnodes=$(world_size) --nproc_per_node=1 --node_rank=$(rank) --master_addr=192.168.1.154 --master_port=8003 app/dist_vgg16.py --world_size $(world_size) --rank $(rank) --log_file ./results/benchmark_vgg16_${rank}.log
 
 run-dist-vgg16-ours:
-	python3 app/dist_vgg16_ours.py --rank $(rank) --world_size $(world_size) --dist_url tcp://192.168.1.170:4003 --log_file ./results/benchmark_vgg16_ours1_${rank}.log
+	torchrun --nnodes=$(world_size) --nproc_per_node=1 --node_rank=$(rank) --master_addr=192.168.1.154 --master_port=8003 app/dist_vgg16_ours.py --world_size $(world_size) --rank $(rank) --log_file ./results/benchmark_vgg16_ours_${rank}.log
 
 run-dist-vgg16-1g:
-	python3 app/dist_vgg16_1g_allreduce.py --rank $(rank) --world_size $(world_size) --dist_url tcp://192.168.1.170:4004 --log_file ./results/benchmark_vgg16_${rank}.log
+	python3 app/dist_vgg16_1g_allreduce.py --rank $(rank) --world_size $(world_size) --dist_url tcp://192.168.1.154:4004 --log_file ./results/benchmark_vgg16_${rank}.log
 
 run-dist-vgg16-topk:
-	python3 app/dist_vgg16_topk.py --rank $(rank) --world_size $(world_size) --dist_url tcp://192.168.1.170:4005 --log_file ./results/benchmark_vgg_topk_${rank}.log
+	torchrun --nnodes=$(world_size) --nproc_per_node=1 --node_rank=$(rank) --master_addr=192.168.1.154 --master_port=8003 app/dist_vgg16_topk_1.py --world_size $(world_size) --rank $(rank) --log_file ./results/benchmark_dist_vgg16_topk_1_${rank}.log
 
 run-dist-gpt2-ours:
 	python3 app/train_gpt2_dist_ours.py --rank $(rank) --world_size $(world_size) --dist_url tcp://192.168.1.170:4005 --log_file ./results/benchmark_gpt2_${rank}.log
@@ -39,3 +40,7 @@ run-dist-resnet18-topk:
 
 run-dist-resnet18:
 	torchrun --nnodes=2:$(world_size) --nproc_per_node=1 --node_rank=$(rank) --master_addr=192.168.1.154  --master_port=8003 app/dist_resnet18.py --log_file ./results/benchmark_dist_resnet18_${rank}.log
+
+
+run-all:
+	torchrun --nnodes=$(world_size) --nproc_per_node=1 --node_rank=$(rank) --master_addr=192.168.1.169 --master_port=8003 app/all.py --world_size $(world_size) --rank $(rank) --log_file ./results/benchmark_all_${rank}.log --bandwidth 200M --scenario 1
